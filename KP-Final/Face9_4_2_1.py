@@ -11,11 +11,13 @@ import firebase_admin
 from firebase_admin import credentials, db
 import dlib
 
+#Inisialisasi Detektor dan Prediktor training model untuk mendapatkan 68 Titik Landmarks struktur wajah
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("C:/Users/lenovo/AppData/Roaming/Python/Python310/site-packages/face_recognition_models/models/shape_predictor_68_face_landmarks.dat") 
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
+#Mengakses Dir tempat menyimpan kredensial firebase dan inisialisasi aplikasi firebase untuk menghubungkan firebase dan dapat mengakses nya menggunakan kredensial dan database-url nya
 cred_path = os.path.join(base_dir, "D:/vscode/KAPE2/sistempresensidit-firebase-adminsdk-okqli-e67a29dc70.json")
 cred = credentials.Certificate(cred_path)
 firebase_admin.initialize_app(cred, {
