@@ -1,20 +1,21 @@
-import face_recognition
-import cv2
-import numpy as np
+import face_recognition #Library untuk melakukan proses pengenalan dan identifikasi wajah dan menghasilkan encoding wajah
+import cv2 # Library untuk mengakses kamera dan proses video stream
+import numpy as np # Library untuk menangani array
 import csv
 from datetime import datetime, timedelta
 import os
-import tkinter as tk
+import tkinter as tk # untuk menghasilkan dan menampilkan GUI untuk interaksi dengan system
 from tkinter import simpledialog, Label
-from PIL import Image, ImageTk
-import firebase_admin
+from PIL import Image, ImageTk # untuk konversi gambar dari format opencv ke format yang dapat ditampilkan oleh tkinter
+import firebase_admin # library untuk menghubungkan ke firebase dan mengakses realtime database
 from firebase_admin import credentials, db
-import dlib
+import dlib # library untuk memproses deteksi wajah dan mendapatkan training model 68 titik landmarks strukutr wajah berupa indeks
 
 #Inisialisasi Detektor dan Prediktor training model untuk mendapatkan 68 Titik Landmarks struktur wajah
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("C:/Users/lenovo/AppData/Roaming/Python/Python310/site-packages/face_recognition_models/models/shape_predictor_68_face_landmarks.dat") 
 
+#Inisialisasi koneksi ke Firebase menggunakan kredensial yang disimpan dalam file JSON dan menetapkan URL basis data Firebase.
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
 #Mengakses Dir tempat menyimpan kredensial firebase dan inisialisasi aplikasi firebase untuk menghubungkan firebase dan dapat mengakses nya menggunakan kredensial dan database-url nya
@@ -24,6 +25,7 @@ firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://sistempresensidit-default-rtdb.asia-southeast1.firebasedatabase.app/'
 })
 
+# fungsi untuk mencatat presensi
 def insert_attendance_to_firebase(nip, nama, time, day, date, year, status):
     ref = db.reference('data_presensi')
     date_ref = ref.child(date)
@@ -36,6 +38,7 @@ def insert_attendance_to_firebase(nip, nama, time, day, date, year, status):
         'status': status
     })
 
+# fungsi menambahkan data wajah baru
 def insert_to_firebase(nip, nama, encoding):
     ref = db.reference('data_wajah')
     ref.child(nip).set({
@@ -44,6 +47,7 @@ def insert_to_firebase(nip, nama, encoding):
         'encoding_foto': encoding.tolist()
     })
 
+# fungsi mengambil data wajah dari Firebase
 def load_data_wajah():
     ref = db.reference('data_wajah')
     data = ref.get()
@@ -55,6 +59,7 @@ def load_data_wajah():
                 data_wajah[nip] = value
     return data_wajah
 
+# fungsi Menyimpan encoding wajah baru ke dalam info_data_wajah dan Firebase serta menampilkan pesan konfirmasi di terminal
 def register_wajah_baru(nama, nip, encoding_wajah):
     info_data_wajah[nip] = {
         'nip': nip,
@@ -65,6 +70,7 @@ def register_wajah_baru(nama, nip, encoding_wajah):
     print(f"Wajah baru yang teregistrasi: {nama} - {nip}")
     return nip, nama
 
+# Membuka kamera menggunakan OpenCV dan mengatur resolusi video
 info_data_wajah = load_data_wajah()
 encodings_data_wajah = [info['encoding_foto'] for info in info_data_wajah.values()]
 
@@ -72,6 +78,7 @@ video_capture = cv2.VideoCapture(0)
 video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 320)  
 video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)  
 
+# Membuat file CSV baru untuk menyimpan data kehadiran dengan nama file yang mencakup tanggal dan waktu saat ini.
 datetime_terkini = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 csv_file_path = os.path.join(os.path.dirname(__file__), f'Daftar_Presensi_{datetime_terkini}.csv')
 
@@ -84,6 +91,7 @@ hari_berakhir = deadline_presensi + timedelta(days=1)
 
 register_wajah = False
 
+# fungsi untuk Membuka jendela dialog untuk meminta input nama dan NIP dari pengguna ketika meregistrasi wajah baru.
 def prompt_user_input():
     root = tk.Tk()
     root.withdraw()  
@@ -95,6 +103,7 @@ def prompt_user_input():
 
     return nama, nip
 
+# Menginisialisasi jendela GUI menggunakan Tkinter untuk menampilkan informasi waktu, tanggal, dan status deteksi wajah.
 root = tk.Tk()
 root.title("Sistem Presensi Face Recognition DIT")
 
@@ -123,6 +132,7 @@ nip_label.grid(row=1, column=0, sticky="w", padx=10, pady=5, ipadx=5, ipady=5)
 status_label = Label(info_frame, text="Status: ", font=("Helvetica", 12), bg="lightgrey", anchor="w", width=29)
 status_label.grid(row=2, column=0, sticky="w", padx=10, pady=5, ipadx=5, ipady=5)
 
+# fungsi untuk Memperbarui label GUI dengan informasi tentang nama, NIP, dan status deteksi wajah serta mengubah warna latar belakang berdasarkan status.
 def info_update_wajah(nip, nama, status, data_wajah2 = True):
     nama_label.config(text=f"Nama: {nama}")
     nip_label.config(text=f"NIP: {nip}")
@@ -141,6 +151,7 @@ def info_update_wajah(nip, nama, status, data_wajah2 = True):
         nip_label.config(bg="lightgrey")
         status_label.config(bg="lightgrey")
 
+# fungsi untuk Mengatur waktu dan tanggal saat ini pada GUI dan memperbaruinya setiap detik.
 def update_date_time():
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
@@ -149,6 +160,7 @@ def update_date_time():
     tanggal_label.config(text=f"Hari, Tanggal: {current_date}")
     root.after(1000, update_date_time)
 
+# Fungsi detect_head_shake mendeteksi apakah pengguna menggelengkan kepala berdasarkan posisi relatif antara mata, hidung, dan rahang. Jika perbedaan posisi cukup besar, dianggap sebagai gerakan kepala.
 recorded_wajah = set()
 
 def detect_head_shake(landmarks):
@@ -167,6 +179,7 @@ def detect_head_shake(landmarks):
 
     return head_shake_detected
 
+# fungsi Membaca frame dari kamera, mendeteksi wajah, membandingkan encoding wajah yang terdeteksi dengan encoding yang sudah terdaftar, dan memperbarui informasi GUI.
 def show_frame():
     global register_wajah
 
@@ -292,6 +305,7 @@ def on_key_press(event):
 
 root.bind('<KeyPress>', on_key_press) 
 
+# Memulai loop utama Tkinter untuk menjalankan antarmuka dan mengelola pembaruan waktu serta frame kamera.
 update_date_time()
 show_frame()
 root.mainloop()
